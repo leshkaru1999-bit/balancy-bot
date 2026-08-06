@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Balancy — Финансовый дашборд</title>
+  <meta name="description" content="Личный финансовый трекер с голосовым вводом" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="css/style.css?v=6" />
+</head>
+<body>
+
+  <!-- ── APP SHELL ── -->
+  <div class="app" id="app">
+
+    <!-- SCREEN: Home -->
+    <div class="screen active" id="screen-home">
+      <header class="header">
+        <div class="header-user">
+          <p class="header-greeting" data-i18n="greeting">Добро пожаловать 👋</p>
+          <h2 class="header-name" id="user-name">Balancy User</h2>
+        </div>
+        <button class="btn-profile" id="btn-refresh" title="Обновить">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+            <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+        </button>
+      </header>
+
+      <!-- Balance card -->
+      <section class="balance-card" id="balance-card">
+        <p class="balance-label" data-i18n="balance_label">Текущий баланс</p>
+        <h1 class="balance-amount" id="balance-amount">—</h1>
+        <div class="balance-stats">
+          <div class="stat-pill">
+            <div class="stat-pill-icon income-icon">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            </div>
+            <div class="stat-pill-info">
+              <span class="stat-pill-label" data-i18n="income">Доходы</span>
+              <span class="stat-pill-value" id="total-income">—</span>
+            </div>
+          </div>
+          <div class="stat-pill">
+            <div class="stat-pill-icon expense-icon">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+            </div>
+            <div class="stat-pill-info">
+              <span class="stat-pill-label" data-i18n="expense">Расходы</span>
+              <span class="stat-pill-value" id="total-expense">—</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Transactions -->
+      <section class="section">
+        <div class="section-header">
+          <h2 class="section-title" data-i18n="last_ops">Последние операции</h2>
+          <button class="btn-text" onclick="navigate('history')"><span data-i18n="all">Все</span> →</button>
+        </div>
+        
+        <!-- Filter Tabs -->
+        <div class="filter-tabs" id="home-filter-tabs">
+          <button class="filter-tab active" data-filter="all" onclick="setHomeFilter(this)"><span data-i18n="all">Все</span></button>
+          <button class="filter-tab" data-filter="Еда" onclick="setHomeFilter(this)">🍽️ <span data-i18n="cat_food">Еда</span></button>
+          <button class="filter-tab" data-filter="Транспорт" onclick="setHomeFilter(this)">🚌 <span data-i18n="cat_transport">Транспорт</span></button>
+          <button class="filter-tab" data-filter="Продукты" onclick="setHomeFilter(this)">🛒 <span data-i18n="cat_shopping">Продукты</span></button>
+        </div>
+
+        <div class="transactions-list" id="home-tx-list">
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Загружаю...</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- SCREEN: History -->
+    <div class="screen" id="screen-history">
+      <header class="header">
+        <h2 class="screen-title" data-i18n="history">История</h2>
+        <div class="header-filter">
+          <select class="filter-select" id="history-filter" onchange="filterHistory()">
+            <option value="all">Все</option>
+            <option value="expense">Расходы</option>
+            <option value="income">Доходы</option>
+          </select>
+        </div>
+      </header>
+
+      <div class="transactions-list full" id="history-tx-list">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <span>Загружаю...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN: Stats -->
+    <div class="screen" id="screen-stats">
+      <header class="header">
+        <h2 class="screen-title" data-i18n="stats">Статистика</h2>
+      </header>
+      
+      <div class="tabs">
+        <button class="tab active" data-type="expense" onclick="switchStatsTab(this)" data-i18n="expense">Расходы</button>
+        <button class="tab" data-type="income" onclick="switchStatsTab(this)" data-i18n="income">Доходы</button>
+      </div>
+
+      <!-- Donut Chart -->
+      <section class="chart-section">
+        <div class="chart-wrap">
+          <canvas id="chart" width="180" height="180"></canvas>
+          <div class="chart-center" id="chart-center">
+            <p class="chart-center-amount" id="chart-total">—</p>
+            <p class="chart-center-label">сум</p>
+          </div>
+        </div>
+        <div class="chart-legend" id="chart-legend"></div>
+      </section>
+
+      <!-- Category breakdown -->
+      <section class="section">
+        <h2 class="section-title" style="margin-bottom:12px">По категориям</h2>
+        <div id="stats-categories"></div>
+      </section>
+    </div>
+
+    <!-- SCREEN: Add Transaction -->
+    <div class="screen" id="screen-add">
+      <header class="header">
+        <button class="btn-icon" onclick="navigate('home')">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <h2 class="screen-title" data-i18n="add_operation">Новая операция</h2>
+        <div style="width:24px"></div>
+      </header>
+      
+      <div class="add-form">
+        <!-- Type toggle -->
+        <div class="type-toggle" id="type-toggle">
+          <button class="type-btn active" data-type="expense" onclick="selectType('expense', this)">
+            🔴 <span data-i18n="expense">Расход</span>
+          </button>
+          <button class="type-btn" data-type="income" onclick="selectType('income', this)">
+            🟢 <span data-i18n="income">Доход</span>
+          </button>
+        </div>
+
+        <!-- Amount input -->
+        <div class="form-group">
+          <label class="form-label" data-i18n="amount_label">Сумма (сум)</label>
+          <div class="amount-input-wrap">
+            <input
+              type="number"
+              id="add-amount"
+              class="amount-input"
+              placeholder="0"
+              min="0"
+              inputmode="numeric"
+            />
+            <span class="currency-badge">сум</span>
+          </div>
+        </div>
+
+        <!-- Category grid -->
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label class="form-label" data-i18n="cat_label" style="margin-bottom: 0;">Категория</label>
+            <button class="btn-text" style="font-size: 13px;" onclick="navigate('categories')">⚙️ Настроить</button>
+          </div>
+          <div class="category-grid" id="category-grid"></div>
+        </div>
+
+        <!-- Description (optional) -->
+        <div class="form-group">
+          <label class="form-label" data-i18n="comment_label">Описание (необязательно)</label>
+          <input
+            type="text"
+            id="add-desc"
+            class="text-input"
+            placeholder="..."
+          />
+        </div>
+
+        <!-- Submit button -->
+        <button class="btn-submit" id="btn-submit" onclick="submitTransaction()" data-i18n="btn_save">
+          Сохранить
+        </button>
+      </div>
+    </div>
+
+    <!-- SCREEN: Categories Management -->
+    <div class="screen" id="screen-categories">
+      <header class="header">
+        <button class="btn-icon" onclick="navigate('add')">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <h2 class="screen-title">Категории</h2>
+        <div style="width:24px"></div>
+      </header>
+      
+      <div class="tabs">
+        <button class="tab active" data-type="expense" onclick="switchCategoryTab(this)">Расходы</button>
+        <button class="tab" data-type="income" onclick="switchCategoryTab(this)">Доходы</button>
+      </div>
+
+      <div class="transactions-list" id="custom-categories-list" style="margin-top: 16px;">
+        <!-- List of categories will be here -->
+      </div>
+
+      <div class="add-form" style="margin-top: 24px;">
+        <h3 style="margin-bottom: 12px; font-size: 16px; font-weight: 600;">Добавить новую</h3>
+        <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+          <input type="text" id="new-cat-icon" class="text-input" placeholder="🍔" style="width: 60px; text-align: center; font-size: 20px;" maxlength="2" />
+          <input type="text" id="new-cat-name" class="text-input" placeholder="Название" style="flex: 1;" maxlength="30" />
+        </div>
+        <button class="btn-submit" id="btn-add-cat" onclick="addCustomCategory()">Добавить</button>
+      </div>
+    </div>
+
+    <!-- SCREEN: Profile -->
+    <div class="screen" id="screen-profile">
+      <header class="header">
+        <h2 class="screen-title">Профиль</h2>
+      </header>
+      
+      <div class="section" style="margin-top: 16px;">
+        <div class="form-group">
+          <label class="form-label">Имя профиля</label>
+          <div style="display: flex; gap: 12px;">
+            <input type="text" id="profile-name" class="text-input" placeholder="Имя" style="flex: 1;" />
+            <button class="btn-submit" id="btn-save-name" style="width: auto; padding: 0 20px;" onclick="saveProfileName()">Сохранить</button>
+          </div>
+        </div>
+
+        <!-- Premium Status -->
+        <div class="premium-card" id="premium-card" style="margin-top: 24px; padding: 20px; background: linear-gradient(135deg, rgba(255,184,0,0.08), rgba(255,214,0,0.02)); border-radius: 24px; border: 1px solid rgba(255,184,0,0.15); box-shadow: 0 8px 24px rgba(255,184,0,0.05);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="color: #FFD700; display: flex; align-items: center; gap: 6px;">⭐️ Premium</h3>
+            <span id="premium-status" style="font-size: 13px; color: #a1a1aa;">Нет активной подписки</span>
+          </div>
+          <p style="font-size: 13px; color: #a1a1aa; margin-bottom: 12px;">Голосовой ввод и продвинутая статистика.</p>
+          <button class="btn-outline" style="width: 100%; border-color: rgba(255,215,0,0.3); color: #FFD700;" onclick="tg.openTelegramLink('https://t.me/Balancecash_bot?start=premium')">Купить / Продлить</button>
+        </div>
+
+        <!-- Notifications -->
+        <div style="margin-top: 24px; padding: 20px; background: rgba(255,255,255,0.02); border-radius: 24px; border: 1px solid rgba(255,255,255,0.06);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="font-size: 16px; font-weight: 600;">Уведомления</h3>
+            <label class="switch">
+              <input type="checkbox" id="reminders-toggle" onchange="toggleReminders()">
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; opacity: 0.5; pointer-events: none; transition: 0.3s;" id="reminders-time-box">
+            <span style="font-size: 14px; color: #a1a1aa;">Время напоминаний</span>
+            <input type="time" id="reminders-time" class="text-input" style="width: auto; padding: 8px 12px;" onchange="saveReminderTime()" />
+          </div>
+        </div>
+
+        <!-- Budget Limits Menu -->
+        <div style="margin-top: 16px;">
+          <button class="btn-outline" style="width: 100%; display: flex; justify-content: space-between; align-items: center;" onclick="navigate('limits')">
+            <span>📊 Лимиты на месяц (Бюджет)</span>
+            <span>→</span>
+          </button>
+        </div>
+
+        <!-- Reset Data Button -->
+        <div style="margin-top: 24px;">
+          <button class="btn-outline" style="width: 100%; border-color: rgba(255,59,48,0.3); color: #FF3B30;" onclick="resetUserData()">
+            🗑️ Сбросить все данные
+          </button>
+        </div>
+
+        <!-- Privacy Policy Link -->
+        <div style="margin-top: 32px; text-align: center;">
+          <a href="privacy.html" style="color: var(--text3); font-size: 13px; text-decoration: underline; opacity: 0.8;">Политика конфиденциальности</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- SCREEN: Limits -->
+    <div class="screen" id="screen-limits">
+      <header class="header">
+        <button class="btn-icon" onclick="navigate('profile')">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <h2 class="screen-title">Месячные лимиты</h2>
+        <div style="width:24px"></div>
+      </header>
+
+      <div class="transactions-list" id="limits-list" style="margin-top: 16px;">
+        <!-- List of limits will be here -->
+      </div>
+
+      <div class="add-form" style="margin-top: 24px;">
+        <h3 style="margin-bottom: 12px; font-size: 16px; font-weight: 600;">Добавить лимит</h3>
+        <div class="form-group">
+          <label class="form-label">Категория</label>
+          <select id="limit-cat-select" class="text-input" style="appearance: auto; background-color: #1a1a24;"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Сумма (сум)</label>
+          <input type="number" id="limit-amount" class="text-input" placeholder="Например, 500000" />
+        </div>
+        <button class="btn-submit" id="btn-add-limit" onclick="addLimit()">Добавить</button>
+      </div>
+    </div>
+
+  </div>
+
+  <nav class="bottom-nav" id="bottom-nav">
+    <div class="nav-links">
+      <button class="nav-item active" data-screen="home" onclick="navigate('home')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+      </button>
+      <button class="nav-item" data-screen="stats" onclick="navigate('stats')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.21 15.89A10 10 0 1 1 8 2.83M22 12A10 10 0 0 0 12 2v10z"/>
+        </svg>
+      </button>
+      <button class="nav-item" data-screen="profile" onclick="navigate('profile')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+      </button>
+    </div>
+    <button class="nav-add" onclick="openAddScreen()">
+      <div class="nav-add-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </div>
+    </button>
+  </nav>
+
+
+
+  <!-- ── SUCCESS TOAST ── -->
+  <div class="toast" id="toast"></div>
+
+  <script src="js/api.js?v=6"></script>
+  <script src="js/app.js?v=6"></script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  # ─── PostgreSQL ───────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: balancy_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-balancy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-balancy_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-balancy}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-balancy}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Balancy (Bot + API в одном процессе) ─────────────────
+  balancy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: balancy_app
+    restart: unless-stopped
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-balancy}:${POSTGRES_PASSWORD:-balancy_pass}@db:5432/${POSTGRES_DB:-balancy}
+      MINIAPP_URL: ${MINIAPP_URL:-}
+      WEBHOOK_URL: ${WEBHOOK_URL:-}
+      API_HOST: "0.0.0.0"
+      API_PORT: "8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python -m bot.main
+
+volumes:
+  postgres_data:
+    driver: local
