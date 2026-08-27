@@ -1,0 +1,3 @@
+{$DOMAIN} {
+    reverse_proxy balancy:8000
+}
