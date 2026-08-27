@@ -127,14 +127,30 @@ async def get_history(telegram_id: int, limit: int = 10) -> list[Transaction]:
         return result.scalars().all()
 
 
-async def get_stats(telegram_id: int) -> list[dict]:
-    """Статистика по категориям за всё время."""
+async def get_stats(telegram_id: int, period: str = "all", start_date: str = None, end_date: str = None) -> list[dict]:
+    """Статистика по категориям за выбранный период."""
+    now = datetime.utcnow()
+    query = select(Transaction.category, Transaction.type, func.sum(Transaction.amount)).where(Transaction.user_id == telegram_id)
+    
+    if period == "custom" and start_date and end_date:
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        query = query.where(Transaction.created_at >= start, Transaction.created_at <= end)
+    elif period == "day":
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        query = query.where(Transaction.created_at >= start)
+    elif period == "week":
+        start = now - timedelta(days=now.weekday())
+        start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+        query = query.where(Transaction.created_at >= start)
+    elif period == "month":
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        query = query.where(Transaction.created_at >= start)
+        
+    query = query.group_by(Transaction.category, Transaction.type)
+
     async with SessionLocal() as session:
-        result = await session.execute(
-            select(Transaction.category, Transaction.type, func.sum(Transaction.amount))
-            .where(Transaction.user_id == telegram_id)
-            .group_by(Transaction.category, Transaction.type)
-        )
+        result = await session.execute(query)
         rows = result.all()
         return [{"category": r[0], "type": r[1], "total": float(r[2])} for r in rows]
 
@@ -297,3 +313,9 @@ async def check_budget_limit(telegram_id: int, category: str, amount_to_add: flo
         limit_float = float(limit_amount)
         
         return total_spent > limit_float, total_spent, limit_float
+
+
+async def get_total_users_count() -> int:
+    async with SessionLocal() as session:
+        result = await session.execute(select(func.count(User.telegram_id)))
+        return result.scalar() or 0
