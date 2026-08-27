@@ -35,33 +35,13 @@ services:
       WEBHOOK_URL: ${WEBHOOK_URL:-}
       API_HOST: "0.0.0.0"
       API_PORT: "8000"
+    ports:
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
     command: python -m bot.main
 
-  # ─── Caddy (Reverse Proxy & Auto-HTTPS) ───────────────────
-  caddy:
-    image: caddy:2-alpine
-    container_name: balancy_caddy
-    restart: unless-stopped
-    environment:
-      DOMAIN: ${DOMAIN:-balancy-app-bot.duckdns.org}
-      ADMIN_IDS: YOUR_TELEGRAM_ID
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - balancy
-
 volumes:
   postgres_data:
-    driver: local
-  caddy_data:
-    driver: local
-  caddy_config:
     driver: local
