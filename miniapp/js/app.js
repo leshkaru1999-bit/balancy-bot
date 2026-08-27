@@ -11,10 +11,32 @@ if (tg) {
 }
 
 const telegramId = tg?.initDataUnsafe?.user?.id || null;
+const initData = tg?.initData || null;
+
+if (!telegramId || !initData) {
+  const debugTg = window.Telegram?.WebApp ? JSON.stringify(window.Telegram.WebApp.initDataUnsafe) : "No tg object";
+  const debugInitData = window.Telegram?.WebApp?.initData || "empty string";
+  const debugUrl = window.location.href;
+
+  document.getElementById('app').innerHTML = `
+    <div style="padding: 20px; color: white; text-align: center; margin-top: 50px; font-size: 16px; line-height: 1.5; word-break: break-all;">
+      ❌ Ошибка безопасности<br><br>Приложение должно быть открыто только внутри Telegram.
+      <hr style="border-color:#333; margin: 15px 0;">
+      <p style="font-size: 10px; color: yellow; text-align: left;">initData: ${debugInitData}</p>
+      <p style="font-size: 10px; color: yellow; text-align: left;">initDataUnsafe: ${debugTg}</p>
+      <p style="font-size: 10px; color: cyan; text-align: left;">URL: ${debugUrl}</p>
+    </div>
+  `;
+  throw new Error("No secure telegram initData provided");
+}
+
 
 // ── I18N ────────────────────────────────────────────────────────
 const I18N = {
   ru: {
+    loading: "Загрузка...",
+    cancel: "Отмена",
+    error_no_id: "❌ Ошибка!\n\nПожалуйста, закройте это окно, отправьте боту команду /start и нажмите на кнопку «Открыть Balancy» под сообщением бота.",
     greeting: "Добро пожаловать 👋",
     balance_label: "Текущий баланс",
     income: "Доходы",
@@ -71,6 +93,21 @@ function applyTranslations(lang) {
     if (texts[key]) el.textContent = texts[key];
   });
 }
+
+const lang = tg?.initDataUnsafe?.user?.language_code === 'uz' ? 'uz' : 'ru';
+const t = (key) => I18N[lang]?.[key] || key;
+
+if (!telegramId) {
+  document.getElementById('app').innerHTML = `
+    <div style="padding: 20px; color: white; text-align: center; margin-top: 50px; font-size: 16px; line-height: 1.5;">
+      ${t('error_no_id')}
+    </div>
+  `;
+  throw new Error("No telegram ID provided");
+}
+
+let txData = [];
+let userData = null;
 
 // ── State ─────────────────────────────────────────────────────
 let state = {
@@ -658,7 +695,6 @@ async function saveProfileName() {
   try {
     if (telegramId) await apiUpdateUserName(telegramId, name);
     state.firstName = name;
-    document.getElementById("user-name").textContent = name;
     showToast("✅ Имя сохранено!");
     tg?.HapticFeedback?.notificationOccurred("success");
   } catch (err) { showToast("❌ " + err.message); }
@@ -685,7 +721,7 @@ async function _saveReminders() {
   } catch(err) {
     showToast("❌ " + err.message);
   }
-}
+};
 
 async function resetUserData() {
   if (tg && tg.showConfirm) {
@@ -749,6 +785,20 @@ function renderLimits() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   
+  if (!telegramId) {
+    const debugTg = window.Telegram?.WebApp ? JSON.stringify(window.Telegram.WebApp.initDataUnsafe) : "No tg object";
+    const debugUrl = window.location.href;
+    document.getElementById("app").innerHTML = `
+      <div style="padding: 32px; text-align: center; background: var(--bg); word-break: break-all;">
+        <h2 style="font-size: 22px; margin-bottom: 12px; color: var(--text);">Ошибка ID</h2>
+        <p style="color: var(--text2); margin-bottom: 16px;">telegramId = null</p>
+        <p style="color: yellow; text-align: left; font-size: 10px; margin-bottom: 8px;">initDataUnsafe: ${debugTg}</p>
+        <p style="color: cyan; text-align: left; font-size: 10px;">URL: ${debugUrl}</p>
+      </div>
+    `;
+    return;
+  }
+
   state.limits.forEach(lim => {
     // find spent amount
     const spent = state.transactions
@@ -823,38 +873,31 @@ async function deleteLimit(id) {
 // ── Load data ─────────────────────────────────────────────────
 async function loadData() {
   if (!telegramId) {
-    // Demo mode
-    state = {
-      ...state,
-      balance: 1_250_000,
-      transactions: [
-        { id: 1, type: "expense", amount: 45000,     category: "Кафе/Ресторан", description: "обед",           created_at: new Date(Date.now() - 3_600_000).toISOString() },
-        { id: 2, type: "expense", amount: 18000,     category: "Такси",         description: "поездка домой",  created_at: new Date(Date.now() - 7_200_000).toISOString() },
-        { id: 3, type: "income",  amount: 5_000_000, category: "Зарплата",      description: "зарплата июль",  created_at: new Date(Date.now() - 86_400_000).toISOString() },
-        { id: 4, type: "expense", amount: 120000,    category: "Продукты",      description: "супермаркет",    created_at: new Date(Date.now() - 172_800_000).toISOString() },
-        { id: 5, type: "expense", amount: 60000,     category: "Связь",         description: "мобильный",      created_at: new Date(Date.now() - 259_200_000).toISOString() },
-      ],
-      stats: [
-        { category: "Кафе/Ресторан", type: "expense", total: 245000 },
-        { category: "Такси",         type: "expense", total: 118000 },
-        { category: "Продукты",      type: "expense", total: 320000 },
-        { category: "Связь",         type: "expense", total: 60000 },
-        { category: "Зарплата",      type: "income",  total: 5_000_000 },
-        { category: "Фриланс",       type: "income",  total: 800_000 },
-      ],
-    };
-    renderAll();
+    const debugTg = window.Telegram?.WebApp ? JSON.stringify(window.Telegram.WebApp.initDataUnsafe) : "No tg object";
+    const debugUrl = window.location.href;
+    document.getElementById("app").innerHTML = `
+      <div style="padding: 32px; text-align: center; background: var(--bg); word-break: break-all;">
+        <h2 style="font-size: 22px; margin-bottom: 12px; color: var(--text);">Error ID</h2>
+        <p style="color: var(--text2); margin-bottom: 16px;">telegramId = null</p>
+        <p style="color: yellow; text-align: left; font-size: 10px; margin-bottom: 8px;">initDataUnsafe: ${debugTg}</p>
+        <p style="color: cyan; text-align: left; font-size: 10px;">URL: ${debugUrl}</p>
+      </div>
+    `;
     return;
   }
 
   try {
-    const [userData, txData, statsData, catsData, limitsData] = await Promise.all([
+    const [uData, tData, sData, cData, lData] = await Promise.all([
       fetchUser(telegramId),
       fetchTransactions(telegramId),
-      fetchStats(telegramId),
+      fetchStats(telegramId, document.getElementById("stats-period")?.value || "month"),
       fetchCategories(telegramId),
       telegramId ? fetchLimits(telegramId) : Promise.resolve([])
     ]);
+    
+    userData = uData;
+    txData = tData;
+    
     state.balance          = userData.balance      || 0;
     state.language         = userData.language     || "ru";
     state.firstName        = userData.first_name   || "Balancy User";
@@ -863,11 +906,9 @@ async function loadData() {
     state.remindersEnabled = userData.reminders_enabled || false;
     state.reminderTime     = userData.reminder_time || "20:00";
     state.transactions     = txData                || [];
-    state.stats            = statsData             || [];
-    state.customCategories = catsData              || [];
-    state.limits           = limitsData            || [];
-    
-    document.getElementById("user-name").textContent = state.firstName;
+    state.stats            = sData                 || [];
+    state.customCategories = cData                 || [];
+    state.limits           = lData                 || [];
     
     // update global icons map
     state.customCategories.forEach(c => {
@@ -878,8 +919,13 @@ async function loadData() {
     renderAll();
   } catch (err) {
     console.error("Ошибка загрузки:", err);
-    showToast("⚠️ Не удалось загрузить данные");
-  }
+    document.getElementById("app").innerHTML = `
+      <div style="padding: 32px; text-align: left; background: var(--bg); word-break: break-all;">
+        <h2 style="color: red;">Catch Error</h2>
+        <p style="color: yellow; font-size: 12px;">${err.message}</p>
+        <p style="color: cyan; font-size: 10px;">Stack: ${err.stack}</p>
+      </div>
+    `;}
 }
 
 function renderAll() {
@@ -887,6 +933,40 @@ function renderAll() {
   renderHomeTransactions();
   if (state.currentScreen === "stats")   renderStats();
   if (state.currentScreen === "history") renderHistoryFull();
+}
+
+function onPeriodChange() {
+  const period = document.getElementById("stats-period").value;
+  const customRange = document.getElementById("custom-date-range");
+  if (period === "custom") {
+    customRange.style.display = "flex";
+    const today = new Date().toISOString().split('T')[0];
+    if (!document.getElementById("date-start").value) document.getElementById("date-start").value = today;
+    if (!document.getElementById("date-end").value) document.getElementById("date-end").value = today;
+  } else {
+    customRange.style.display = "none";
+  }
+  loadStats();
+}
+
+async function loadStats() {
+  if (!telegramId) return;
+  const period = document.getElementById("stats-period")?.value || "month";
+  let startDate = "";
+  let endDate = "";
+
+  if (period === "custom") {
+    startDate = document.getElementById("date-start").value;
+    endDate = document.getElementById("date-end").value;
+    if (!startDate || !endDate) return;
+  }
+
+  try {
+    state.stats = await fetchStats(telegramId, period, startDate, endDate);
+    renderStats();
+  } catch (err) {
+    showToast("❌ " + err.message);
+  }
 }
 
 // ── Event Listeners ───────────────────────────────────────────

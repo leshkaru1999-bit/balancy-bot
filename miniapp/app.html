@@ -102,22 +102,8 @@
 
     <!-- SCREEN: Stats -->
     <div class="screen" id="screen-stats">
-      <header class="header" style="flex-wrap: wrap;">
+      <header class="header">
         <h2 class="screen-title" data-i18n="stats">Статистика</h2>
-        <div class="header-filter">
-          <select class="filter-select" id="stats-period" onchange="onPeriodChange()">
-            <option value="all">Всё время</option>
-            <option value="day">Сегодня</option>
-            <option value="week">Неделя</option>
-            <option value="month" selected>Месяц</option>
-            <option value="custom">Выбрать даты...</option>
-          </select>
-        </div>
-        <div id="custom-date-range" style="display: none; width: 100%; gap: 10px; margin-top: 10px; align-items: center; justify-content: space-between;">
-          <input type="date" id="date-start" class="text-input" style="flex: 1; min-width: 0; padding: 8px;" onchange="loadStats()" />
-          <span style="color: var(--text2);">-</span>
-          <input type="date" id="date-end" class="text-input" style="flex: 1; min-width: 0; padding: 8px;" onchange="loadStats()" />
-        </div>
       </header>
       
       <div class="tabs">
@@ -375,7 +361,7 @@
   <!-- ── SUCCESS TOAST ── -->
   <div class="toast" id="toast"></div>
 
-  <script src="js/api.js?v=1061"></script>
-  <script src="js/app.js?v=1061"></script>
+  <script src="js/api.js?v=1010"></script>
+  <script src="js/app.js?v=1010"></script>
 </body>
 </html>

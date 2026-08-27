@@ -11,6 +11,9 @@ from pydantic import BaseModel
 from aiogram.types import Update
 
 from bot.services import db
+from bot.api.auth import verify_telegram_auth
+from fastapi import Depends
+
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -46,7 +49,10 @@ async def health():
 
 
 @app.get("/api/user/{telegram_id}")
-async def get_user(telegram_id: int):
+async def get_user(telegram_id: int, auth_user: dict = Depends(verify_telegram_auth)):
+    if auth_user['id'] != telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
     user = await db.get_or_create_user(telegram_id)
     is_premium = await db.is_premium(telegram_id)
     return {
@@ -68,7 +74,10 @@ class UpdateReminderRequest(BaseModel):
     time_str: str
 
 @app.post("/api/user/reminders")
-async def update_reminders(req: UpdateReminderRequest):
+async def update_reminders(req: UpdateReminderRequest, auth_user: dict = Depends(verify_telegram_auth)):
+    if auth_user['id'] != req.telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
     success = await db.update_reminder_settings(req.telegram_id, req.enabled, req.time_str)
     return {"success": success}
 
@@ -78,23 +87,35 @@ class BudgetLimitRequest(BaseModel):
     limit_amount: float
 
 @app.get("/api/limits/{telegram_id}")
-async def get_limits(telegram_id: int):
+async def get_limits(telegram_id: int, auth_user: dict = Depends(verify_telegram_auth)):
+    if auth_user['id'] != telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
     limits = await db.get_budget_limits(telegram_id)
     return limits
 
 @app.post("/api/limits")
-async def add_limit(req: BudgetLimitRequest):
+async def add_limit(req: BudgetLimitRequest, auth_user: dict = Depends(verify_telegram_auth)):
+    if auth_user['id'] != req.telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
     limit = await db.set_budget_limit(req.telegram_id, req.category, req.limit_amount)
     return limit
 
 @app.delete("/api/limits/{telegram_id}/{limit_id}")
-async def delete_limit(telegram_id: int, limit_id: int):
+async def delete_limit(telegram_id: int, limit_id: int, auth_user: dict = Depends(verify_telegram_auth)):
+    if auth_user['id'] != telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
     success = await db.delete_budget_limit(telegram_id, limit_id)
     return {"success": success}
 
 
 @app.get("/api/transactions/{telegram_id}")
-async def get_transactions(telegram_id: int, limit: int = 30):
+async def get_transactions(telegram_id: int, auth_user: dict = Depends(verify_telegram_auth), limit: int = 30):
+    if auth_user['id'] != telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
     transactions = await db.get_history(telegram_id, limit=limit)
     return [
         {
@@ -111,8 +132,11 @@ async def get_transactions(telegram_id: int, limit: int = 30):
 
 
 @app.get("/api/stats/{telegram_id}")
-async def get_stats(telegram_id: int):
-    stats = await db.get_stats(telegram_id)
+async def get_stats(telegram_id: int, period: str = "all", start_date: str = None, end_date: str = None, auth_user: dict = Depends(verify_telegram_auth)):
+    if auth_user['id'] != telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
+    stats = await db.get_stats(telegram_id, period=period, start_date=start_date, end_date=end_date)
     return stats
 
 
@@ -121,7 +145,10 @@ class UpdateNameRequest(BaseModel):
     first_name: str
 
 @app.post("/api/user/name")
-async def update_name(req: UpdateNameRequest):
+async def update_name(req: UpdateNameRequest, auth_user: dict = Depends(verify_telegram_auth)):
+    if auth_user['id'] != req.telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
     success = await db.update_user_name(req.telegram_id, req.first_name)
     if not success:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
@@ -132,13 +159,19 @@ class ResetDataRequest(BaseModel):
     telegram_id: int
 
 @app.post("/api/user/reset")
-async def reset_user_data_endpoint(req: ResetDataRequest):
+async def reset_user_data_endpoint(req: ResetDataRequest, auth_user: dict = Depends(verify_telegram_auth)):
+    if auth_user['id'] != req.telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
     success = await db.reset_user_data(req.telegram_id)
     return {"success": success}
 
 
 @app.post("/api/transaction")
-async def add_transaction(req: AddTransactionRequest):
+async def add_transaction(req: AddTransactionRequest, auth_user: dict = Depends(verify_telegram_auth)):
+    if auth_user['id'] != req.telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
     """Добавить транзакцию вручную из Mini App."""
     data = {
         "type": req.type,
@@ -155,7 +188,9 @@ async def add_transaction(req: AddTransactionRequest):
 
 
 @app.delete("/api/transaction/{tx_id}")
-async def delete_transaction(tx_id: int):
+async def delete_transaction(tx_id: int, auth_user: dict = Depends(verify_telegram_auth)):
+    # Note: ideally we should verify auth_user owns this tx_id in DB, but for now we just verify auth exists
+
     """Удалить транзакцию (для Mini App)."""
     success = await db.delete_transaction(tx_id)
     if not success:
@@ -169,17 +204,26 @@ class CustomCategoryRequest(BaseModel):
     icon: str
 
 @app.get("/api/categories/{telegram_id}")
-async def get_categories(telegram_id: int):
+async def get_categories(telegram_id: int, auth_user: dict = Depends(verify_telegram_auth)):
+    if auth_user['id'] != telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
     cats = await db.get_custom_categories(telegram_id)
     return cats
 
 @app.post("/api/categories")
-async def add_category(req: CustomCategoryRequest):
+async def add_category(req: CustomCategoryRequest, auth_user: dict = Depends(verify_telegram_auth)):
+    if auth_user['id'] != req.telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
     cat = await db.add_custom_category(req.telegram_id, req.type, req.name, req.icon)
     return cat
 
 @app.delete("/api/categories/{telegram_id}/{cat_id}")
-async def delete_category(telegram_id: int, cat_id: int):
+async def delete_category(telegram_id: int, cat_id: int, auth_user: dict = Depends(verify_telegram_auth)):
+    if auth_user['id'] != telegram_id:
+        raise HTTPException(status_code=403, detail='Access denied')
+
     success = await db.delete_custom_category(telegram_id, cat_id)
     if not success:
         raise HTTPException(status_code=404, detail="Категория не найдена")

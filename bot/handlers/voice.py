@@ -92,15 +92,15 @@ async def handle_voice(message: Message, bot: Bot):
     lang = user.language or "ru"
     has_premium = await db.is_premium(message.from_user.id)
     
-    if not has_premium:
-        from bot.services.texts import get_text
-        from bot.handlers.commands import open_app_keyboard
-        # Покажем клавиатуру покупки позже, но сейчас текст:
-        markup = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text=get_text(lang, "btn_buy_premium"), callback_data="buy_premium")
-        ]])
-        await message.answer(get_text(lang, "voice_premium_only"), reply_markup=markup)
-        return
+    # if not has_premium:
+    #     from bot.services.texts import get_text
+    #     from bot.handlers.commands import open_app_keyboard
+    #     # Покажем клавиатуру покупки позже, но сейчас текст:
+    #     markup = InlineKeyboardMarkup(inline_keyboard=[[
+    #         InlineKeyboardButton(text=get_text(lang, "btn_buy_premium"), callback_data="buy_premium")
+    #     ]])
+    #     await message.answer(get_text(lang, "voice_premium_only"), reply_markup=markup)
+    #     return
 
     processing_msg = await message.answer("🎙️")
     try:

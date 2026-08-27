@@ -14,7 +14,8 @@ def fmt(n: float) -> str:
 def open_app_btn(lang: str = "ru"):
     if cfg.MINIAPP_URL:
         from bot.services.texts import get_text
-        return [InlineKeyboardButton(text=get_text(lang, "btn_app"), web_app=WebAppInfo(url=cfg.MINIAPP_URL))]
+        base_url = cfg.MINIAPP_URL if cfg.MINIAPP_URL.endswith("index.html") else cfg.MINIAPP_URL.rstrip('/') + "/index.html"
+        return [InlineKeyboardButton(text=get_text(lang, "btn_app"), web_app=WebAppInfo(url=f"{base_url}?v=1050"))]
     return []
 
 
@@ -26,18 +27,21 @@ async def cb_language_selection(callback: CallbackQuery):
     from bot.services.texts import get_text
     from bot.handlers.commands import input_keyboard, open_app_keyboard
     
-    markup = open_app_keyboard(lang)
-    await callback.message.delete()
+    markup = open_app_keyboard(lang, callback.from_user.id)
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass  # Сообщение уже удалено или недоступно — игнорируем
     
     if markup:
         await callback.message.answer(
             get_text(lang, "welcome", name=callback.from_user.first_name),
-            reply_markup=input_keyboard(lang)
+            reply_markup=input_keyboard(lang, callback.from_user.id)
         )
     else:
         await callback.message.answer(
             get_text(lang, "welcome_no_app", name=callback.from_user.first_name),
-            reply_markup=input_keyboard(lang)
+            reply_markup=input_keyboard(lang, callback.from_user.id)
         )
     
     await callback.answer(get_text(lang, "lang_selected"))

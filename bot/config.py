@@ -11,6 +11,7 @@ MINIAPP_URL: str = os.getenv("MINIAPP_URL", "")  # ngrok URL + /miniapp
 API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
 API_PORT: int = int(os.getenv("API_PORT", "8000"))
 WEBHOOK_URL: str = os.getenv("WEBHOOK_URL", "")  # e.g., https://balancy.app/webhook
+ADMIN_IDS: list[int] = [int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()]
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN не задан в .env файле!")
