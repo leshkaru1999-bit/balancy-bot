@@ -36,12 +36,11 @@ async def cb_language_selection(callback: CallbackQuery):
     if markup:
         await callback.message.answer(
             get_text(lang, "welcome", name=callback.from_user.first_name),
-            reply_markup=input_keyboard(lang, callback.from_user.id)
+            reply_markup=markup
         )
     else:
         await callback.message.answer(
-            get_text(lang, "welcome_no_app", name=callback.from_user.first_name),
-            reply_markup=input_keyboard(lang, callback.from_user.id)
+            get_text(lang, "welcome_no_app", name=callback.from_user.first_name)
         )
     
     await callback.answer(get_text(lang, "lang_selected"))
